@@ -1,0 +1,73 @@
+class PowerMeterSimulatorAllRanges(DummyInstrument):
+    """
+    PowerMeterSimulatorAllRanges
+
+    Simulates a power meter that can read any optical power level without range restrictions.
+    
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._instrument_property_wavelength = 1550
+        self._instrument_property_unit = 'dBm'
+        self._instrument_property_avgtime = 0.001
+        self._trigger = "cont"
+        self._last_val = -99.0
+        self.external_input_power_dBm = -35  # will be set externally by laser or test script
+
+    def _simulate_opt_power_value(self):
+        # Simulate realistic readout with noise but no dynamic range limits
+        return self.external_input_power_dBm + np.random.normal(scale=0.02)
+
+    def idn(self):
+        return "PowerMeterSimulatorAllRanges"
+
+    @property
+    def wavelength(self):
+        return self._instrument_property_wavelength
+
+    @wavelength.setter
+    def wavelength(self, wl_nm):
+        self._instrument_property_wavelength = wl_nm
+
+    @property
+    def unit(self):
+        return self._instrument_property_unit
+
+    @unit.setter
+    def unit(self, pu):
+        if 'dbm' in pu.lower() or 'watt' in pu.lower():
+            self._instrument_property_unit = pu
+        else:
+            raise InstrumentException(f'Unknown unit: {pu}, use dBm or Watt')
+
+    @property
+    def averagetime(self):
+        return self._instrument_property_avgtime
+
+    @averagetime.setter
+    def averagetime(self, atime_s):
+        self._instrument_property_avgtime = atime_s
+
+    @property
+    def power(self):
+        time.sleep(self._instrument_property_avgtime)
+        self._last_val = self._simulate_opt_power_value()
+        return self._last_val
+
+    def trigger(self, continuous=None):
+        if continuous is None:
+            self._trigger = 'on'
+            time.sleep(self._instrument_property_avgtime)
+        elif continuous:
+            self._trigger = 'on'
+        else:
+            self._trigger = 'off'
+
+    def fetch_power(self):
+        if self._trigger == 'on':
+            self._last_val = self._simulate_opt_power_value()
+            return self._last_val
+        elif self._trigger == 'off':
+            return self._last_val
+        else:
+            raise RuntimeError(f"Trigger mode invalid: {self._trigger}")
